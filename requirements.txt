@@ -1,0 +1,9 @@
+# Core: text & table extraction from PDFs
+pdfplumber>=0.11
+
+# Data wrangling and Excel export
+pandas>=2.2
+openpyxl>=3.1
+
+# Only needed to regenerate the synthetic sample statements
+reportlab>=4.0
