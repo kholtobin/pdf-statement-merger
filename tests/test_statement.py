@@ -121,6 +121,76 @@ def test_table_without_date_or_amount_header_is_ignored(fake_pdf):
     assert "no transactions extracted" in st.warnings
 
 
+def test_table_without_a_description_column_still_yields_transactions(fake_pdf):
+    """Date + Amount is enough; a missing Description column must not raise."""
+    fake_pdf(
+        text=HEADER_TEXT + "Net movement for period -120.50",
+        tables=[
+            transaction_table(
+                ["2026-01-05", "-45.50"],
+                ["2026-01-09", "-75.00"],
+                header=["Date", "Amount"],
+            )
+        ],
+    )
+    st = parse_statement(FAKE_PATH)
+
+    assert len(st.transactions) == 2
+    assert st.transactions[0] == {
+        "date": "2026-01-05",
+        "description": "",
+        "amount": -45.50,
+        "category": "Uncategorised",
+    }
+    assert st.computed_net == pytest.approx(-120.50)
+    assert st.reconciled is True
+    assert st.warnings == []
+
+
+def test_descriptionless_rows_are_still_validated(fake_pdf):
+    """The date/amount checks keep working when there is no description column."""
+    fake_pdf(
+        text=HEADER_TEXT + "Net movement for period -45.50",
+        tables=[
+            transaction_table(
+                ["2026-01-05", "-45.50"],
+                ["not a date", "-10.00"],
+                ["2026-01-07"],  # too short: no amount cell
+                header=["Date", "Amount"],
+            )
+        ],
+    )
+    st = parse_statement(FAKE_PATH)
+
+    assert len(st.transactions) == 1
+    assert [w for w in st.warnings if w.startswith("unparsed row:")] == [
+        "unparsed row: ['not a date', '-10.00']"
+    ]
+
+
+def test_description_column_after_amount_is_read_from_its_own_position(fake_pdf):
+    """Columns are located by header name, not by assuming Date/Description/Amount."""
+    fake_pdf(
+        text=HEADER_TEXT + "Net movement for period -45.50",
+        tables=[
+            transaction_table(
+                ["2026-01-05", "-45.50", "Coworking desk rental"],
+                header=["Date", "Amount", "Description"],
+            )
+        ],
+    )
+    st = parse_statement(FAKE_PATH)
+
+    assert st.transactions == [
+        {
+            "date": "2026-01-05",
+            "description": "Coworking desk rental",
+            "amount": -45.50,
+            "category": "Office",
+        }
+    ]
+
+
 def test_unparsable_rows_are_reported_and_dropped(fake_pdf):
     fake_pdf(
         text=HEADER_TEXT + "Net movement for period -45.50",

@@ -113,26 +113,26 @@ def parse_statement(pdf_path: Path) -> Statement:
         header = [(c or "").strip().lower() for c in table[0]]
         if "date" not in header or "amount" not in header:
             continue
-        d_i, desc_i, a_i = (
-            header.index("date"),
-            header.index("description"),
-            header.index("amount"),
-        )
+        d_i, a_i = header.index("date"), header.index("amount")
+        # Some layouts omit the description column entirely.
+        desc_i = header.index("description") if "description" in header else None
+        needed = max(d_i, a_i, desc_i if desc_i is not None else 0)
         for row in table[1:]:
             cells = [(c or "").strip() for c in row]
-            if len(cells) <= max(d_i, desc_i, a_i):
+            if len(cells) <= needed:
                 continue
             iso = parse_date(cells[d_i])
             amount = parse_amount(cells[a_i])
             if iso is None or amount is None:
                 st.warnings.append(f"unparsed row: {cells[:3]}")
                 continue
+            description = cells[desc_i] if desc_i is not None else ""
             st.transactions.append(
                 {
                     "date": iso,
-                    "description": cells[desc_i],
+                    "description": description,
                     "amount": amount,
-                    "category": categorise(cells[desc_i]),
+                    "category": categorise(description),
                 }
             )
 
@@ -159,8 +159,19 @@ def _month_number(name: str) -> int:
 
 # --- Reporting ------------------------------------------------------------
 
+TRANSACTION_COLUMNS = [
+    "Month",
+    "Date",
+    "Description",
+    "Category",
+    "Amount",
+    "Source File",
+]
+
 
 def build_report(statements: list[Statement], out_path: Path) -> pd.DataFrame:
+    # Named up front so a statement with no transactions still yields the full
+    # set of columns instead of an empty frame the sort and pivot would reject.
     tx = pd.DataFrame(
         [
             {
@@ -173,7 +184,8 @@ def build_report(statements: list[Statement], out_path: Path) -> pd.DataFrame:
             }
             for st in statements
             for t in st.transactions
-        ]
+        ],
+        columns=TRANSACTION_COLUMNS,
     ).sort_values(["Date", "Description"], ignore_index=True)
 
     summary = pd.DataFrame(

@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from conftest import EXPECTED, TOTAL_TRANSACTIONS
-from merge_statements import build_report
+from merge_statements import Statement, build_report
 
 TRANSACTION_COLUMNS = ["Month", "Date", "Description", "Category", "Amount", "Source File"]
 SUMMARY_COLUMNS = [
@@ -167,3 +167,65 @@ def test_report_scales_down_to_a_subset(tmp_path, parsed_statements):
     tx = sheet(path, "Transactions")
     assert len(tx) == sum(len(st.transactions) for st in subset)
     assert set(tx["Month"]) == {st.period for st in subset}
+
+
+# --- statements that yielded nothing --------------------------------------
+
+
+def empty_statement(name="statement_2026_13.pdf", period=None) -> Statement:
+    """What parse_statement returns for a PDF it could not read."""
+    return Statement(
+        source_file=name,
+        period=period,
+        transactions=[],
+        stated_net=None,
+        warnings=["no transactions extracted", "stated net movement not found"],
+    )
+
+
+def test_one_unreadable_statement_does_not_sink_the_report(tmp_path, parsed_statements):
+    """It belongs in Summary/Notes, not as an exception that kills the run."""
+    statements = [*parsed_statements[:2], empty_statement()]
+    path = tmp_path / "with_empty.xlsx"
+    summary = build_report(statements, path)
+
+    assert len(summary) == 3
+    tx = sheet(path, "Transactions")
+    assert len(tx) == sum(len(st.transactions) for st in parsed_statements[:2])
+
+    row = summary[summary["Transactions"] == 0].iloc[0]
+    assert row["Reconciled"] == "NO"
+    assert "no transactions extracted" in row["Notes"]
+    assert row["Net"] == 0
+
+
+def test_report_of_only_empty_statements_still_builds(tmp_path):
+    path = tmp_path / "all_empty.xlsx"
+    summary = build_report(
+        [empty_statement("a.pdf", "2026-01"), empty_statement("b.pdf", "2026-02")], path
+    )
+
+    assert path.exists()
+    assert list(summary.columns) == SUMMARY_COLUMNS
+    assert summary["Transactions"].tolist() == [0, 0]
+    assert summary["Month"].tolist() == ["2026-01", "2026-02"]
+
+
+def test_empty_transactions_sheet_keeps_its_columns(tmp_path):
+    path = tmp_path / "all_empty.xlsx"
+    build_report([empty_statement()], path)
+
+    tx = sheet(path, "Transactions")
+    assert list(tx.columns) == TRANSACTION_COLUMNS
+    assert tx.empty
+
+
+def test_empty_report_keeps_all_three_sheets(tmp_path):
+    path = tmp_path / "all_empty.xlsx"
+    build_report([empty_statement()], path)
+
+    workbook = openpyxl.load_workbook(path)
+    assert workbook.sheetnames == ["Summary", "By Category", "Transactions"]
+    for ws in workbook.worksheets:
+        assert ws.freeze_panes == "A2"
+        assert all(cell.font.bold for cell in ws[1])
