@@ -18,17 +18,19 @@ Point the script at a folder of statements and it produces one clean workbook:
 - **Categorisation** — transactions grouped by configurable keyword rules
 - **Reconciliation** — the computed net is checked against the net printed on each statement; any mismatch is flagged rather than silently absorbed
 - **Three sheets** — `Summary` (per-month totals), `By Category` (category × month breakdown), `Transactions` (every row, traceable to its source file)
+- **Degrades gracefully** — a statement with a missing description column, unparsable rows or no readable table is warned about in `Summary` and does not sink the rest of the run
 
 ## Demo
-
-<!-- banner added in the next step -->
 
 Running it against the twelve sample statements:
 
 ```
-statement_2026_01.pdf:  14 tx  net    22,340.64
-statement_2026_02.pdf:  14 tx  net   -15,294.83
+statement_2026_01.pdf:  14 tx  net   22,340.64
+statement_2026_02.pdf:  14 tx  net  -15,294.83
+statement_2026_03.pdf:   9 tx  net    4,183.27
 ...
+statement_2026_12.pdf:  10 tx  net   -1,559.64
+
 12 statements, 143 transactions -> output/report.xlsx
 All periods reconcile.
 ```
@@ -60,6 +62,16 @@ python src/generate_samples.py
 python src/merge_statements.py --input samples/ --output output/report.xlsx
 ```
 
+## Tests
+
+124 tests covering normalisation, statement parsing, report structure and the CLI —
+run against both synthetic PDF fixtures and stubbed `pdfplumber` pages.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## Adapting it
 
 Two places are meant to be tuned per client:
@@ -71,10 +83,15 @@ Two places are meant to be tuned per client:
 
 ```
 pdf-statement-merger/
-├── src/          # parsing, normalisation, reporting
-├── samples/      # 12 synthetic monthly statements
-├── output/       # generated reports (git-ignored)
-├── requirements.txt
+├── src/
+│   ├── merge_statements.py   # parsing, normalisation, reporting, CLI
+│   └── generate_samples.py   # builds the synthetic statement PDFs
+├── tests/                    # pytest suite + PDF fixtures
+├── samples/                  # 12 synthetic monthly statements
+├── output/                   # generated reports (git-ignored)
+├── requirements.txt          # runtime deps
+├── requirements-dev.txt      # runtime + pytest
+├── pytest.ini
 └── README.md
 ```
 
