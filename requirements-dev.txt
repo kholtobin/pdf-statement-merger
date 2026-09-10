@@ -3,3 +3,8 @@
 -r requirements.txt
 
 pytest>=8.0
+
+# Only needed to rebuild assets/before-after.png (src/build_banner.py),
+# not to run the test suite.
+pymupdf>=1.24
+pillow>=10.0
