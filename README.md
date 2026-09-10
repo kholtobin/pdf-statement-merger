@@ -5,6 +5,8 @@ Twelve monthly statements in twelve separate PDFs, consolidated into a single Ex
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
+![Twelve monthly statement PDFs consolidated into one reconciled Excel report](assets/before-after.png)
+
 ## The problem
 
 A year of monthly statements arrives as a dozen separate PDFs, each with its own quirks — one uses `2026-01-05`, the next `05/01/2026`, a third writes `Jan 5, 2026`. Debits show up as `-1,234.56` in some files and `(1,234.56)` in others. Consolidating that by hand is a full day of copy-pasting, and a single mistyped figure quietly breaks the totals.
@@ -85,9 +87,11 @@ Two places are meant to be tuned per client:
 pdf-statement-merger/
 ├── src/
 │   ├── merge_statements.py   # parsing, normalisation, reporting, CLI
-│   └── generate_samples.py   # builds the synthetic statement PDFs
+│   ├── generate_samples.py   # builds the synthetic statement PDFs
+│   └── build_banner.py       # renders assets/before-after.png
 ├── tests/                    # pytest suite + PDF fixtures
 ├── samples/                  # 12 synthetic monthly statements
+├── assets/                   # README banner
 ├── output/                   # generated reports (git-ignored)
 ├── requirements.txt          # runtime deps
 ├── requirements-dev.txt      # runtime + pytest
